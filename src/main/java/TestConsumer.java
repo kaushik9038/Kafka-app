@@ -40,29 +40,39 @@ class TeriMaaKaBosda {
                 .option("kafka.bootstrap.servers", "localhost:9092")
                 .option("subscribe", "channel_1")
                 .load();
-        df.createOrReplaceTempView("test_table");
-        Dataset<Row> sqlTable =session.sql("SELECT * FROM test_table");
+        df.createOrReplaceTempView("network");
+        Dataset<Row> sqlTable =session.sql("SELECT cast(value as string) FROM network");
 
-        StreamingQuery row  = sqlTable.writeStream().format("console").outputMode(OutputMode.Append()).start();
-        Dataset<Row> jdbcDf = session.read()
-                .format("jdbc")
-                .option("url","jdbc:postgresql://localhost/postgres")
-                .option("dbtable","postgres")
-                .option("driver","org.postgresql.Driver")
-                .option("user","postgres")
-                .option("password","postgres")
-                .load();
+        StreamingQuery row  = sqlTable.writeStream().foreachBatch(new VoidFunction2<Dataset<Row>, Long>() {
+            @Override
+            public void call(Dataset<Row> rowDataset, Long aLong) throws Exception {
+                rowDataset.write()
+                        .format("jdbc")
+                        .mode("overwrite")
+                        .option("url","jdbc:postgresql://localhost:5432/postgres")
+                        .option("dbtable","network")
+                        .option("driver","org.postgresql.Driver")
+                        .option("user","postgres")
+                        .option("password","postgres")
+                        .save();
+            }
 
-        jdbcDf.write()
-                .format("jdbc")
-                .option("url","jdbc:postgresql://localhost/postgres")
-                .option("dbtable","postgres")
-                .option("driver","org.postgresql.Driver")
-                .option("user","postgres")
-                .option("password","postgres")
-                .save();
-        
+        }).start();
+
         row.awaitTermination();
+
+
+       /**Dataset<Row> jdbcDf = session.read()
+                .format("jdbc")
+                .option("url","jdbc:postgresql://localhost:5432/postgres")
+                .option("dbtable","network")
+                .option("driver","org.postgresql.Driver")
+                .option("user","postgres")
+                .option("password","postgres").load();**/
+
+
+        
+        //row.awaitTermination();
 
 
 
